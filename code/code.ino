@@ -1,6 +1,5 @@
 
-#include <SoftwareSerial.h>
-SoftwareSerial mySerial (11, 5);
+
 
 
 #define BLACK 0x0000
@@ -452,9 +451,11 @@ void LCD_draw(int16_t col, int16_t row, int16_t width, int16_t height, int16_t c
 
 
 // The structure to manage the QR code
+
+int currentScreen = 1;
+int prevScreen = 0;
 void setup() {
   Serial.begin(115200);
-  mySerial.begin(19200);
   // Set pins 1-8 as output
   BD_as_output();
   // Set pins A0-A4 as output
@@ -524,10 +525,22 @@ void showWelcomeScreen() {
   print_centered_str("PRESS DISPENSE BUTTON");
   P_ROW = 140;
   print_centered_str("FOR TEA");
-
   displayBottomBar("IOT : Connected.");
 }
+void showWaitForQR() {
+  LCD_clear(WHITE);
+  P_ROW = 140;
+  print_centered_str("FETCHING QR");
+}
+
+void showWaitingWifi() {
+  LCD_clear(WHITE);
+  P_ROW = 140;
+  print_centered_str("Waiting for WIFI");
+}
+
 void showOrderOkScreen() {
+  if (currentScreen == 2 && prevScreen != 2) return;
   LCD_clear(WHITE);
   P_ROW = 140;
   print_centered_str("ORDER SUCCESS");
@@ -546,6 +559,8 @@ void showTxnFailedScreen() {
   LCD_clear(WHITE);
   P_ROW = 140;
   print_centered_str("TRANSACTION FAILED");
+  P_ROW = 170;
+  print_centered_str("OR TIMED OUT");
 }
 void showTxnSuccessScreen() {
   LCD_clear(WHITE);
@@ -567,27 +582,30 @@ void showThankyouScreen() {
 
 boolean qrStarted = false;
 
-void loop(){
 
-  if (mySerial.available()) // if there is data comming
+
+void loop() {
+
+  if (Serial.available()) // if there is data comming
   {
-    String command = mySerial.readStringUntil('\n'); // read
-    Serial.println(command);
+    String command = Serial.readStringUntil('\n'); // read
+
     // CMD1
     if (qrStarted) {
-      Serial.println("QR STARTED");
       if (command == "CMD10") {
+        displayBottomBar("SCAN QR AND PAY RS.10");
         qrStarted = false;
         return;
       }
       showQR(command);
       return;
     }
-    Serial.println(command.substring(0, 2));
+
     if (command.substring(0, 3) != "CMD") return;
-    Serial.println("COMMAND FOUND");
     int cmd =  command.substring(3).toInt();
     Serial.println(cmd);
+    prevScreen = currentScreen;
+    currentScreen = cmd;
     switch (cmd) {
       case 1:
         showWelcomeScreen();
@@ -596,6 +614,7 @@ void loop(){
         showOrderOkScreen();
         break;
       case 3:
+        LCD_clear(WHITE);
         qrStarted = true;
         break;
       case 4:
@@ -618,6 +637,13 @@ void loop(){
         break;
       case 10:
         qrStarted = false;
+        displayBottomBar("SCAN QR AND PAY RS 10");
+        break;
+      case 11:
+        showWaitForQR();
+        break;
+      case 12:
+        showWaitingWifi();
         break;
       default:
         return;
